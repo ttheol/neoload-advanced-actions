@@ -1,0 +1,1 @@
+If the package or the name of CoAPClientAction is updated, the content of the file META-INF\services\com.neotys.extensions.action.Action must be updated as well to allow the action to be loaded in NeoLoad.
