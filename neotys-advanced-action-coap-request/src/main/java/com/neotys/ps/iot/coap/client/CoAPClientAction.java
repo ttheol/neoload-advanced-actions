@@ -62,6 +62,10 @@ public final class CoAPClientAction implements Action{
 		description.append("  - Async (optional): Specify the async parameter with no value for asynchronous requests\n");
 		description.append("  - Confirmable (optional): Set to true or false.\n    If true, request is confirmable. If false, request is non-confirmable.\n");
 		description.append("  - Payload (optional): Send a payload along a POST or PUT request\n");		
+		description.append("  - Token (optional): Specifies a token for the request\n");
+		description.append("  - If-None-Match (optional): Adds the If-None-Match header in a PUT request. No value needs to be specified\n");
+		description.append("  - If-Match (optional): Adds an If-Match header in a PUT request. Value needs to be an etag\n");
+		description.append("You can also add any parameter with any name and value. NeoLoad will concatenate them in the path for a GET, and in the payload for a POST or PUT.\n");
 		
 		return description.toString();
 	}
