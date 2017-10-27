@@ -1,12 +1,14 @@
 package com.neotys.ps.iot.coap.client;
 
-import java.util.ArrayList;
 import java.util.List;
+
+import javax.xml.bind.DatatypeConverter;
 
 import org.eclipse.californium.core.CoapClient;
 import org.eclipse.californium.core.CoapResponse;
 import org.eclipse.californium.core.Utils;
 import org.eclipse.californium.core.coap.MediaTypeRegistry;
+import org.eclipse.californium.core.coap.OptionSet;
 import org.eclipse.californium.core.coap.Request;
 
 import com.neotys.extensions.action.ActionParameter;
@@ -24,24 +26,18 @@ public final class CoAPClientActionEngine implements ActionEngine {
 	private static boolean confirmable;				//true if the request is confirmable, false otherwise
 	private static String payload;					//Payload to send in the PUT or POST
 	private static StringBuilder parameterList;		//List of GET, POST or PUT parameters to send with the request
-	private static int accept;						//Desired format of the response
-	private static int payloadType;					//Type format of the payload. Default is text/plain
-	private static boolean ifNoneMatch;				//Set to true if specified in the request. false otherwise
-	private static ArrayList<byte[]> ifMatch ;				//etags for the If-Match header
-		
+	private static byte[] token;
 	
-	private static void parseParameters(List<ActionParameter> parameters){
+	private static OptionSet parseParameters(List<ActionParameter> parameters){
 		
-		//Setting default value
+		OptionSet options = new OptionSet();
+		//Setting default values
 		scheme = "coap";
 		confirmable = true;		
 		payload = "";
 		parameterList = new StringBuilder();
-		accept = -1;
-		payloadType = 0;
-		ifNoneMatch = false;
-		ifMatch= new ArrayList<byte[]>();
-		int i = 0;					//Counter for the If-Match array of etags
+		token=null;
+		options.setContentFormat(MediaTypeRegistry.TEXT_PLAIN);
 		
 		for (ActionParameter temp:parameters){
 			switch (temp.getName().toLowerCase()) {
@@ -63,23 +59,32 @@ public final class CoAPClientActionEngine implements ActionEngine {
 			case "payload":
 				payload=temp.getValue();
 				break;
-			case "payloadtype":
-				payloadType=MediaTypeRegistry.parse(temp.getValue());
+			case "content-format":
+				options.setContentFormat(MediaTypeRegistry.parse(temp.getValue()));
 				break;
 			case "accept":
-				accept = MediaTypeRegistry.parse(temp.getValue());
+				options.setAccept(MediaTypeRegistry.parse(temp.getValue()));
 				break;
 			case "if-none-match":
-				ifNoneMatch = true;
+				options.setIfNoneMatch(true);
 				break;
 			case "if-match":
-				ifMatch.add(hexStringToByteArray(temp.getValue()));
-				i++;
+				options.addIfMatch(DatatypeConverter.parseHexBinary((temp.getValue())));				
+				break;
+			case "token":
+				token = temp.getValue().getBytes();
+				break;
+			case "etag":
+				options.addETag(DatatypeConverter.parseHexBinary((temp.getValue())));
 				break;
 			default :
+				//If the name of the parameter is unknown, add it to the payload or path
+				//If the parameter is the first one
 				if (parameterList.length()==0) {
+					//Prefix with a ?
 					parameterList.append("?");
 				} else {
+					//Prefix with a &
 					parameterList.append("&");
 				}
 				parameterList.append(temp.getName());
@@ -88,143 +93,75 @@ public final class CoAPClientActionEngine implements ActionEngine {
 				break;
 			}
 		}
-	}
-	
-	private static CoapResponse sendGet(CoapClient client) {
-		//Initialise the response
-		CoapResponse response=null;		
+		return options;
+	}	
 
-		if (accept==-1) {
-			//Send the request
-			response = client.get();
-		} else {
-			response = client.get(accept);
-		}
-		
-		//Return the response
-		return response;
-	}
-	
-	private static CoapResponse sendPost(CoapClient client) {
-		//Initialise the response
-		CoapResponse response=null;
-		
-		//If the request doesn't specify a return type
-		if (accept==-1) {
-			//Send a standard request
-			response = client.post(payload, payloadType);
-		} else {		
-			//Use the accept header in the request
-			response = client.post(payload, payloadType, accept);
-		}
-		
-		//Return the response
-		return response;
-	}
-	
-	private static CoapResponse sendPut(CoapClient client) {
-		//Initialise the response
-		CoapResponse response=null;		
-
-		//If the If-None-Match header is not specified
-		if (!ifNoneMatch) {
-			//If the If-Match header is not specified
-			if (ifMatch.isEmpty()) {
-				//Send the standard request
-				response = client.put(payload, payloadType);				
-			} else {
-								
-				//Create an array of etags
-				byte[][] etags = new byte[ifMatch.size()][];
-				for (int i=0;i < ifMatch.size();i++) {
-					//byte[] temp = ifMatch.get(i);
-					etags[i] = ifMatch.get(i);
-				}
-				
-				//Use the etags
-				response = client.putIfMatch(payload, payloadType, etags);
-			}
-		} else {
-			//Send the request with the If-None-Match header
-			response = client.putIfNoneMatch(payload, payloadType);
-		}
-		
-		//Return the response
-		return response;
-	}
-	
-	private static CoapResponse sendDelete(CoapClient client) {
-		//Initialise the response
-		CoapResponse response=null;
-		
-		//Send the request
-		response = client.delete();
-		
-		//Return the response
-		return response;
-	}
 	
 	@Override
 	public SampleResult execute(Context context, List<ActionParameter> parameters) {
 		final SampleResult sampleResult = new SampleResult();
 		final StringBuilder requestBuilder = new StringBuilder();
 		final StringBuilder responseBuilder = new StringBuilder();
-		parseParameters(parameters);
-		
+		OptionSet options = parseParameters(parameters);
+				
 		//If I have parameters to send
 		if (parameterList.length()>0) {
-			//Handling the parameters based on the method
+			//Handle the parameters based on the method
 			switch (method) {
-			case "GET":
+			case "GET":		//Add the parameters to the path
 				path = String.format("%s%s", path,parameterList.toString());
 				break;
-			case "POST": case "PUT":
+			case "POST": case "PUT":	//Add the parameters to the payload
 				payload = String.format("%s%s",payload,parameterList.toString());
 			}
 		}
 		
-		//Instantiate the client
+		//Instantiate the CoAP client
 		CoapClient client = new CoapClient(scheme,server,port,path);
-		if (confirmable) {
-			client.useCONs();
-		} else {
-			client.useNONs();
-		}
+		String uri = client.getURI();
 		
-		appendLineToStringBuilder(requestBuilder,String.format("%s %s",method,client.getURI()));
-		appendLineToStringBuilder(requestBuilder,String.format("%s %d","If-Match count",ifMatch.size()));
-		appendLineToStringBuilder(requestBuilder,String.format("\n%s",payload));
-		sampleResult.setRequestContent(requestBuilder.toString());
-		
-		sampleResult.sampleStart();
-
-		CoapResponse response=null;
-		//Send the request
+		//Instantiate a request and set its options
+		Request req12;
 		switch (method) {
-		case "GET":
-			response = sendGet(client);
-			break;
 		case "POST":
-			response = sendPost(client);
+			req12 = Request.newPost();
+			req12.setPayload(payload);
 			break;
 		case "PUT":
-			response = sendPut(client);
+			req12 = Request.newPut();
+			req12.setPayload(payload);
 			break;
 		case "DELETE":
-			response = sendDelete(client);
+			req12 = Request.newDelete();
 			break;
 		default:
-			response = sendGet(client);
+			req12 = Request.newGet();			
 			break;
 		}
+		req12.setConfirmable(confirmable);		
+		req12.setOptions(options);
+		req12.setToken(token);
+		
+		//Log the request
+		appendLineToStringBuilder(requestBuilder,String.format("%s",uri));
+		appendLineToStringBuilder(requestBuilder,Utils.prettyPrint(req12));
+		appendLineToStringBuilder(requestBuilder,req12.getOptions().toString());
+		sampleResult.setRequestContent(requestBuilder.toString());
+
+		CoapResponse response=null;
+
+		sampleResult.sampleStart();
+
+		//Send the request
+		response = client.advanced(req12);
+		
+		sampleResult.sampleEnd();
 		
 		if (response != null) {
 			appendLineToStringBuilder(responseBuilder, Utils.prettyPrint(response));
 		} else {
 			return getErrorResult(context,sampleResult,"No response","NL-CoAPClient-01",null);
 		}
-			
-		sampleResult.sampleEnd();
 		
 		
 		sampleResult.setResponseContent(responseBuilder.toString());

@@ -59,12 +59,12 @@ public final class CoAPClientAction implements Action{
 		description.append("  - Server (required): address of the CoAP server\n");
 		description.append("  - Port (required): Port of the CoAP endpoint\n");
 		description.append("  - Path (optional): Path to the URI without the first /\n");
-		description.append("  - Async (optional): Specify the async parameter with no value for asynchronous requests\n");
 		description.append("  - Confirmable (optional): Set to true or false.\n    If true, request is confirmable. If false, request is non-confirmable.\n");
 		description.append("  - Payload (optional): Send a payload along a POST or PUT request\n");		
 		description.append("  - Token (optional): Specifies a token for the request\n");
 		description.append("  - If-None-Match (optional): Adds the If-None-Match header in a PUT request. No value needs to be specified\n");
-		description.append("  - If-Match (optional): Adds an If-Match header in a PUT request. Value needs to be an etag\n");
+		description.append("  - If-Match (optional): Adds an If-Match header in a PUT request. Value needs to be an hex etag without the 0x\n");
+		description.append("  - Etag (optional): Adds an etag to the request. Value needs to be in hex format without the 0x\n");
 		description.append("You can also add any parameter with any name and value. NeoLoad will concatenate them in the path for a GET, and in the payload for a POST or PUT.\n");
 		
 		return description.toString();
