@@ -67,11 +67,11 @@ public final class CloudWatchMonitoringActionEngine implements ActionEngine {
 		}
 	}
 
-	public static void traceMetrics (AmazonCloudWatchClient awsClient,ListMetricsResult listMetrics, Date startTime, Date endTime, int period, DataExchangeAPIClient dataExchangeAPIClient) throws JSONException, GeneralSecurityException, IOException, ODataException, URISyntaxException, NeotysAPIException{
+	private static void traceMetrics (AmazonCloudWatchClient awsClient,ListMetricsResult listMetrics, Date startTime, Date endTime, int period, DataExchangeAPIClient dataExchangeAPIClient) throws JSONException, GeneralSecurityException, IOException, ODataException, URISyntaxException, NeotysAPIException{
 		List<Metric> metrics = listMetrics.getMetrics();
 		List<String> stats = Arrays.asList("Average") ;
 		
-		//Parcours des métriques
+		//Parcours des mÃ©triques
 		for (int i = 0; i < metrics.size(); i++){
 			String metricName = metrics.get(i).getMetricName();
 			String namespace = metrics.get(i).getNamespace();
@@ -113,8 +113,7 @@ public final class CloudWatchMonitoringActionEngine implements ActionEngine {
 	}
 	
 	@Override
-	public SampleResult execute(Context context,
-			List<ActionParameter> parameters) {
+	public SampleResult execute(Context context, List<ActionParameter> parameters) {
 
 		SampleResult result = new SampleResult();
 		StringBuilder resultString = new StringBuilder();
@@ -138,11 +137,11 @@ public final class CloudWatchMonitoringActionEngine implements ActionEngine {
 				
 			dataExchangeAPIClient = DataExchangeAPIClientFactory.newClient("http://"+ dataExchangeHost +":7400/DataExchange/v1/Service.svc/");			
 	
-			//Récupération de la première page de métriques
+			//RÃ©cupÃ©ration de la premiÃ¨re page de mÃ©triques
 			ListMetricsRequest listRequest = new ListMetricsRequest();
 			String nextToken = "";
 	
-			//Parcours de toutes les métriques
+			//Parcours de toutes les mÃ©triques
 			while (nextToken!=null) {
 
 				ListMetricsResult availableMetrics = awsClient.listMetrics(listRequest);
